@@ -15,6 +15,8 @@
  */
 
 package org.tensorflow.codelabs.objectdetection
+ //org.tensorflow.lite.support.image.TensorImage
+ //org.tensorflow.lite.task.vision.detector.ObjectDetector
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -35,6 +37,9 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.task.vision.detector.Detection
+import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -113,7 +118,54 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
      *      TFLite Object Detection function
      */
     private fun runObjectDetection(bitmap: Bitmap) {
-        //TODO: Add object detection code here
+        // Step 1: create TFLite's TensorImage object
+        val image = TensorImage.fromBitmap(bitmap)
+
+        // Step 2: Initialize the detector object
+        val options = ObjectDetector.ObjectDetectorOptions.builder()
+            .setMaxResults(5)
+            .setScoreThreshold(0.5f)
+            .build()
+        val detector = ObjectDetector.createFromFileAndOptions(
+            this, // the application context
+            "COCO2017.tflite", // must be same as the filename in assets folder
+            options
+        )
+
+        // Step 3: feed given image to the model and print the detection result
+        val results = detector.detect(image)
+
+        // Step 4: Parse the detection result and show it
+        //debugPrint(results)
+
+        val resultToDisplay = results.map {
+            // Get the top-1 category and craft the display text
+            val category = it.categories.first()
+            val text = "${category.label}, ${category.score.times(100).toInt()}%"
+
+            // Create a data object to display the detection result
+            DetectionResult(it.boundingBox, text)
+        }
+    // Draw the detection result on the bitmap and show it.
+        val imgWithResult = drawDetectionResult(bitmap, resultToDisplay)
+        runOnUiThread {
+            inputImageView.setImageBitmap(imgWithResult)
+        }
+    }
+
+    private fun debugPrint(results : List<Detection>) {
+        for ((i, obj) in results.withIndex()) {
+            val box = obj.boundingBox
+
+            Log.d(TAG, "Detected object: ${i} ")
+            Log.d(TAG, "  boundingBox: (${box.left}, ${box.top}) - (${box.right},${box.bottom})")
+
+            for ((j, category) in obj.categories.withIndex()) {
+                Log.d(TAG, "    Label $j: ${category.label}")
+                val confidence: Int = category.score.times(100).toInt()
+                Log.d(TAG, "    Confidence: ${confidence}%")
+            }
+        }
     }
 
     /**
